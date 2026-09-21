@@ -1,0 +1,674 @@
+import { UserAccount, HDMachine, SpecialTask, ShiftSchedule, MachineAssignment } from '../types';
+
+export const INITIAL_EMPLOYEES: UserAccount[] = [
+  {
+    id: 'emp-admin',
+    username: 'admin',
+    password: 'admin123',
+    name: 'Administrator Unit HD',
+    nickname: 'Admin',
+    gender: 'L',
+    role: 'admin',
+    nip: '198503152010011002',
+    phone: '0812-3456-7890',
+    email: 'admin.hemo@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Sistem Informasi & Manajemen HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-karu',
+    username: 'karu_hd',
+    password: 'karu123',
+    name: 'Kepala Ruang HD',
+    nickname: 'Karu',
+    gender: 'P',
+    role: 'kepala_ruangan',
+    nip: '198005122005012003',
+    phone: '0812-3456-7890',
+    email: 'karu.hemo@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Kepala Ruangan Hemodialisa',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-dr-reza',
+    username: 'dr_reza',
+    password: 'dokter123',
+    name: 'dr. Reza Rizki Ramadhan',
+    nickname: 'dr. Reza',
+    gender: 'L',
+    role: 'dokter',
+    nip: '198811052014021001',
+    phone: '0812-9876-5432',
+    email: 'reza.ramadhan@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Dokter Penanggung Jawab Pelayanan HD (Pagi)',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-dr-paramitha',
+    username: 'dr_paramitha',
+    password: 'dokter123',
+    name: 'dr. Paramitha Kusumadewi',
+    nickname: 'dr. Mitha',
+    gender: 'P',
+    role: 'dokter',
+    nip: '199004182016032002',
+    phone: '0813-8765-4321',
+    email: 'paramitha.kusumadewi@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Dokter Jaga Hemodialisa (Siang)',
+    createdAt: '2026-01-01',
+  },
+  // Perawat Sif Pagi
+  {
+    id: 'emp-fransisca',
+    username: 'fransisca',
+    password: 'perawat123',
+    name: 'FRANSISCA RANI L',
+    nickname: 'Fransisca',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199201102015022001',
+    phone: '0812-1111-0001',
+    email: 'fransisca.rani@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-rizky',
+    username: 'rizky_wahyu',
+    password: 'perawat123',
+    name: 'RIZKY WAHYU A',
+    nickname: 'Rizky',
+    gender: 'L',
+    role: 'pj_shift',
+    nip: '199104052014011003',
+    phone: '0812-1111-0002',
+    email: 'rizky.wahyu@happyland.co.id',
+    status: 'aktif',
+    specialization: 'PJ Shift / Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-twis',
+    username: 'twis_fertilianti',
+    password: 'perawat123',
+    name: 'TWIS FERTILIANTI P W',
+    nickname: 'Twis',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199307152016032002',
+    phone: '0812-1111-0003',
+    email: 'twis.fertilianti@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-annisa',
+    username: 'annisa_nur',
+    password: 'perawat123',
+    name: 'ANNISA NUR FAJRI M',
+    nickname: 'Annisa',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199408202017042001',
+    phone: '0812-1111-0004',
+    email: 'annisa.fajri@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-haikal',
+    username: 'm_haikal',
+    password: 'perawat123',
+    name: 'M. HAIKAL MALILANG',
+    nickname: 'Haikal',
+    gender: 'L',
+    role: 'perawat',
+    nip: '199503122018021002',
+    phone: '0812-1111-0005',
+    email: 'haikal.malilang@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD / CITO Coordinator',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-nita',
+    username: 'nita_restiana',
+    password: 'perawat123',
+    name: 'NITA RESTIANA',
+    nickname: 'Nita',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199312012016032004',
+    phone: '0812-1111-0006',
+    email: 'nita.restiana@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-dea',
+    username: 'dea_ika',
+    password: 'perawat123',
+    name: 'DEA IKA P',
+    nickname: 'Dea',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199602252019012001',
+    phone: '0812-1111-0007',
+    email: 'dea.ika@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  // Perawat Sif Siang
+  {
+    id: 'emp-siswantini',
+    username: 'siswantini',
+    password: 'perawat123',
+    name: 'SISWANTINI CATUR P',
+    nickname: 'Siswantini',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199108142014022003',
+    phone: '0812-2222-0001',
+    email: 'siswantini.catur@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-ayu-w',
+    username: 'ayu_wulandari',
+    password: 'perawat123',
+    name: 'AYU WULANDARI',
+    nickname: 'Ayu W',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199209192015032002',
+    phone: '0812-2222-0002',
+    email: 'ayu.wulandari@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-hari',
+    username: 'hari_endah',
+    password: 'perawat123',
+    name: 'HARI ENDAH',
+    nickname: 'Hari',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199011112013012001',
+    phone: '0812-2222-0003',
+    email: 'hari.endah@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-brilli',
+    username: 'y_brillisanto',
+    password: 'perawat123',
+    name: 'Y. BRILLISANTO',
+    nickname: 'Brilli',
+    gender: 'L',
+    role: 'perawat',
+    nip: '198906202012011002',
+    phone: '0812-2222-0004',
+    email: 'y.brillisanto@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-ayu-p',
+    username: 'ayu_puspita',
+    password: 'perawat123',
+    name: 'AYU PUSPITA R',
+    nickname: 'Ayu P',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199405022017022003',
+    phone: '0812-2222-0005',
+    email: 'ayu.puspita@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-aprillia',
+    username: 'aprillia_dwi',
+    password: 'perawat123',
+    name: 'APRILLIA DWI N',
+    nickname: 'Aprillia',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199504142018032001',
+    phone: '0812-2222-0006',
+    email: 'aprillia.dwi@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-rini',
+    username: 'rini_wulandari',
+    password: 'perawat123',
+    name: 'RINI WULANDARI',
+    nickname: 'Rini',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199303102016012002',
+    phone: '0812-2222-0007',
+    email: 'rini.wulandari@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-novialita',
+    username: 'novialita_a',
+    password: 'perawat123',
+    name: 'NOVIALITA ARYADI',
+    nickname: 'Novialita',
+    gender: 'P',
+    role: 'pj_shift',
+    nip: '199010082013022004',
+    phone: '0812-2222-0008',
+    email: 'novialita.aryadi@happyland.co.id',
+    status: 'aktif',
+    specialization: 'PJ Shift / Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  // Staf Libur / Off
+  {
+    id: 'emp-khoirudin',
+    username: 'm_nor_khoirudin',
+    password: 'perawat123',
+    name: 'M NOR KHOIRUDIN',
+    nickname: 'Khoirudin',
+    gender: 'L',
+    role: 'perawat',
+    nip: '199102142014011004',
+    phone: '0812-3333-0001',
+    email: 'nor.khoirudin@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+  {
+    id: 'emp-reni',
+    username: 'reni_dwi',
+    password: 'perawat123',
+    name: 'RENI DWI A',
+    nickname: 'Reni',
+    gender: 'P',
+    role: 'perawat',
+    nip: '199406182017032002',
+    phone: '0812-3333-0002',
+    email: 'reni.dwi@happyland.co.id',
+    status: 'aktif',
+    specialization: 'Perawat Mahir HD',
+    createdAt: '2026-01-01',
+  },
+];
+
+export const HOSPITAL_LAYOUT_40_MACHINES: HDMachine[] = [
+  // Zona A (A01 - A12) - 12 Bed deretan tunggal sisi A
+  ...Array.from({ length: 12 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return {
+      id: `mach-a${num}`,
+      code: `A${num}`,
+      brand: 'Fresenius Medical Care',
+      model: '4008S Classic',
+      zone: 'Zona A (Reguler)',
+      status: 'siap' as const,
+      serialNumber: `FMC-4008S-A${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: `Bed No. A${num} (Deretan 12 Bed Sisi A)`,
+    };
+  }),
+  // Zona B (B01 - B09) - 9 Bed (B01-B04 Sisi Lorong, B05-B09 Sisi Dinding Dekat Pintu Masuk)
+  ...Array.from({ length: 9 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    const isCorridor = i < 4; // B01-B04
+    return {
+      id: `mach-b${num}`,
+      code: `B${num}`,
+      brand: 'Fresenius Medical Care',
+      model: '4008S Classic',
+      zone: 'Zona B (Reguler)',
+      status: 'siap' as const,
+      serialNumber: `FMC-4008S-B${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: isCorridor ? `Bed No. B${num} (Sisi B Sisi Lorong)` : `Bed No. B${num} (Sisi B Sisi Dinding)`,
+    };
+  }),
+  // Zona C (C01 - C08) - 8 Bed (C01-C04 Sisi Lorong, C05-C08 Sisi Dinding Barat)
+  ...Array.from({ length: 8 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    const isCorridor = i < 4; // C01-C04
+    return {
+      id: `mach-c${num}`,
+      code: `C${num}`,
+      brand: 'Fresenius Medical Care',
+      model: '4008S Classic',
+      zone: 'Zona C (Reguler)',
+      status: 'siap' as const,
+      serialNumber: `FMC-4008S-C${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: isCorridor ? `Bed No. C${num} (Sisi C Sisi Lorong)` : `Bed No. C${num} (Sisi C Sisi Dinding)`,
+    };
+  }),
+  // Zona D (D01 - D03) - 3 Bed (Area D Sayap Luar)
+  ...Array.from({ length: 3 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return {
+      id: `mach-d${num}`,
+      code: `D${num}`,
+      brand: 'Fresenius Medical Care',
+      model: '4008S Classic',
+      zone: 'Zona D (Reguler)',
+      status: 'siap' as const,
+      serialNumber: `FMC-4008S-D${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: `Bed No. D${num} (Area D)`,
+    };
+  }),
+  // Zona E (E01 - E02) - 2 Bed (Area E Sayap Luar)
+  ...Array.from({ length: 2 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return {
+      id: `mach-e${num}`,
+      code: `E${num}`,
+      brand: 'Fresenius Medical Care',
+      model: '4008S Classic',
+      zone: 'Zona E (Reguler)',
+      status: 'siap' as const,
+      serialNumber: `FMC-4008S-E${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: `Bed No. E${num} (Area E)`,
+    };
+  }),
+  // Zona F (F01 - F02) - 2 Bed (Area F Sayap Luar)
+  ...Array.from({ length: 2 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return {
+      id: `mach-f${num}`,
+      code: `F${num}`,
+      brand: 'Fresenius Medical Care',
+      model: '4008S Classic',
+      zone: 'Zona F (Reguler)',
+      status: 'siap' as const,
+      serialNumber: `FMC-4008S-F${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: `Bed No. F${num} (Area F)`,
+    };
+  }),
+  // Zona Isolasi (ISO 01 - ISO 04) - 4 Bed (Ruang Isolasi Khusus)
+  ...Array.from({ length: 4 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return {
+      id: `mach-iso${num}`,
+      code: `ISO ${num}`,
+      brand: 'Fresenius Medical Care',
+      model: '5008S CorDiax',
+      zone: 'Zona Isolasi',
+      status: 'siap' as const,
+      serialNumber: `FMC-5008S-ISO${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: `Bed Isolasi ISO ${num} (Ruang Isolasi Khusus Infeksius / CITO)`,
+    };
+  }),
+];
+
+export const HOSPITAL_LAYOUT_41_MACHINES = HOSPITAL_LAYOUT_40_MACHINES;
+export const HOSPITAL_LAYOUT_30_MACHINES = HOSPITAL_LAYOUT_40_MACHINES;
+export const INITIAL_MACHINES: HDMachine[] = HOSPITAL_LAYOUT_40_MACHINES;
+
+export const INITIAL_SPECIAL_TASKS: SpecialTask[] = [
+  // Shift Pagi (2026-09-19)
+  {
+    id: 'task-pagi-pj-1',
+    title: 'PJ Shift Hemodialisa Pagi',
+    description: 'Penanggung jawab operasional shift pagi, koordinasi alur pasien & visite dokter',
+    assignedToId: 'emp-rizky',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'pagi',
+    priority: 'mendesak',
+    status: 'in_progress',
+    category: 'pj_shift',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-pagi-farmasi-1',
+    title: 'Pengelolaan Farmasi & Logistik Pagi',
+    description: 'Penyiapan konsentrat asid, bikarbonat, heparin, dan obat-obatan emergensi',
+    assignedToId: 'emp-fransisca',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'pagi',
+    priority: 'penting',
+    status: 'in_progress',
+    category: 'farmasi_logistik',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-pagi-bhp-1',
+    title: 'Distribusi & Verifikasi BHP Pagi (Y Brillisanto)',
+    description: 'Stok bloodline, AV fistula needle, dialyzer, dan spuit HD',
+    assignedToId: 'emp-brilli',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'pagi',
+    priority: 'normal',
+    status: 'in_progress',
+    category: 'bhp',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-pagi-bhp-2',
+    title: 'Distribusi & Verifikasi BHP Pagi (Dea Ika P)',
+    description: 'Stok bloodline, AV fistula needle, dialyzer, dan spuit HD',
+    assignedToId: 'emp-dea',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'pagi',
+    priority: 'normal',
+    status: 'in_progress',
+    category: 'bhp',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-pagi-cito-1',
+    title: 'Penanggung Jawab Emergency HD / CITO',
+    description: 'Siap sedia tindakan HD CITO pasien ICU/IGD & alokasi mesin isolasi',
+    assignedToId: 'emp-haikal',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'pagi',
+    priority: 'mendesak',
+    status: 'in_progress',
+    category: 'cito',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+
+  // Shift Siang (2026-09-19)
+  {
+    id: 'task-siang-pj-1',
+    title: 'PJ Shift Hemodialisa Siang',
+    description: 'Penanggung jawab operasional shift siang & laporan akhir desinfeksi',
+    assignedToId: 'emp-novialita',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'siang',
+    priority: 'mendesak',
+    status: 'pending',
+    category: 'pj_shift',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-siang-bhp-1',
+    title: 'Distribusi & Verifikasi BHP Siang (Ayu Puspita R)',
+    description: 'Stok bloodline, AV fistula, dialyzer shift 2',
+    assignedToId: 'emp-ayu-p',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'siang',
+    priority: 'normal',
+    status: 'pending',
+    category: 'bhp',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-siang-bhp-2',
+    title: 'Distribusi & Verifikasi BHP Siang (Rini Wulandari)',
+    description: 'Stok bloodline, AV fistula, dialyzer shift 2',
+    assignedToId: 'emp-rini',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'siang',
+    priority: 'normal',
+    status: 'pending',
+    category: 'bhp',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-siang-cito-1',
+    title: 'Penanggung Jawab Emergency HD / CITO Siang (Aprillia Dwi N)',
+    description: 'Kesiapsiagaan CITO IGD & Ruang Isolasi Siang',
+    assignedToId: 'emp-aprillia',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'siang',
+    priority: 'mendesak',
+    status: 'pending',
+    category: 'cito',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-siang-cito-2',
+    title: 'Penanggung Jawab Emergency HD / CITO Siang (Rini Wulandari)',
+    description: 'Kesiapsiagaan CITO IGD & Ruang Isolasi Siang',
+    assignedToId: 'emp-rini',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'siang',
+    priority: 'mendesak',
+    status: 'pending',
+    category: 'cito',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+  {
+    id: 'task-siang-farmasi-1',
+    title: 'Pengelolaan Farmasi & Logistik Siang',
+    description: 'Penyiapan konsentrat dialisat & stok resep pasien sore/malam',
+    assignedToId: 'emp-brilli',
+    assignedByName: 'Kepala Ruang HD',
+    date: '2026-09-19',
+    shift: 'siang',
+    priority: 'penting',
+    status: 'pending',
+    category: 'farmasi_logistik',
+    createdAt: '2026-09-19T06:30:00Z',
+  },
+];
+
+export function getInitialSchedules(): ShiftSchedule[] {
+  const date = '2026-09-19';
+  return [
+    // Kepala Ruangan
+    { id: `emp-karu_${date}`, employeeId: 'emp-karu', date, shift: 'pagi', note: 'Supervisi Operasional Unit HD' },
+    // Dokter
+    { id: `emp-dr-reza_${date}`, employeeId: 'emp-dr-reza', date, shift: 'pagi', note: 'Dokter Penanggung Jawab HD Pagi' },
+    { id: `emp-dr-paramitha_${date}`, employeeId: 'emp-dr-paramitha', date, shift: 'siang', note: 'Dokter Jaga HD Siang' },
+    // Pagi (7 perawat)
+    { id: `emp-fransisca_${date}`, employeeId: 'emp-fransisca', date, shift: 'pagi', note: 'Dinas Pagi' },
+    { id: `emp-rizky_${date}`, employeeId: 'emp-rizky', date, shift: 'pagi', note: 'Dinas Pagi (PJ Shift)' },
+    { id: `emp-twis_${date}`, employeeId: 'emp-twis', date, shift: 'pagi', note: 'Dinas Pagi' },
+    { id: `emp-annisa_${date}`, employeeId: 'emp-annisa', date, shift: 'pagi', note: 'Dinas Pagi' },
+    { id: `emp-haikal_${date}`, employeeId: 'emp-haikal', date, shift: 'pagi', note: 'Dinas Pagi (CITO)' },
+    { id: `emp-nita_${date}`, employeeId: 'emp-nita', date, shift: 'pagi', note: 'Dinas Pagi' },
+    { id: `emp-dea_${date}`, employeeId: 'emp-dea', date, shift: 'pagi', note: 'Dinas Pagi' },
+    // Siang (8 perawat)
+    { id: `emp-siswantini_${date}`, employeeId: 'emp-siswantini', date, shift: 'siang', note: 'Dinas Siang' },
+    { id: `emp-ayu-w_${date}`, employeeId: 'emp-ayu-w', date, shift: 'siang', note: 'Dinas Siang' },
+    { id: `emp-hari_${date}`, employeeId: 'emp-hari', date, shift: 'siang', note: 'Dinas Siang' },
+    { id: `emp-brilli_${date}`, employeeId: 'emp-brilli', date, shift: 'siang', note: 'Dinas Siang' },
+    { id: `emp-ayu-p_${date}`, employeeId: 'emp-ayu-p', date, shift: 'siang', note: 'Dinas Siang' },
+    { id: `emp-aprillia_${date}`, employeeId: 'emp-aprillia', date, shift: 'siang', note: 'Dinas Siang' },
+    { id: `emp-rini_${date}`, employeeId: 'emp-rini', date, shift: 'siang', note: 'Dinas Siang' },
+    { id: `emp-novialita_${date}`, employeeId: 'emp-novialita', date, shift: 'siang', note: 'Dinas Siang (PJ Shift)' },
+    // Libur / Off
+    { id: `emp-khoirudin_${date}`, employeeId: 'emp-khoirudin', date, shift: 'libur', note: 'Libur Rutin Bergilir' },
+    { id: `emp-reni_${date}`, employeeId: 'emp-reni', date, shift: 'libur', note: 'Libur Rutin Bergilir' },
+  ];
+}
+
+export function getInitialMachineAssignments(): MachineAssignment[] {
+  const date = '2026-09-19';
+  const assignments: MachineAssignment[] = [];
+
+  const add = (shift: 'pagi' | 'siang', nurseId: string, machineIds: string[]) => {
+    machineIds.forEach((mId) => {
+      assignments.push({
+        id: `${date}_${shift}_${mId}`,
+        date,
+        shift,
+        machineId: mId,
+        nurseId,
+        targetUF: '2.5 L',
+        dialyzerType: 'Hi-Flux F7HPS',
+      });
+    });
+  };
+
+  // PAGI:
+  // 1. FRANSISCA RANI L : A01 s/d A03 (3 mesin)
+  add('pagi', 'emp-fransisca', ['mach-a01', 'mach-a02', 'mach-a03']);
+  // 2. RIZKY WAHYU A : A04 s/d A06 (3 mesin)
+  add('pagi', 'emp-rizky', ['mach-a04', 'mach-a05', 'mach-a06']);
+  // 3. TWIS FERTILIANTI P W : A08 s/d A11 (4 mesin)
+  add('pagi', 'emp-twis', ['mach-a08', 'mach-a09', 'mach-a10', 'mach-a11']);
+  // 4. ANNISA NUR FAJRI M : A12 s/d C02 (3 mesin: A12, C01, C02)
+  add('pagi', 'emp-annisa', ['mach-a12', 'mach-c01', 'mach-c02']);
+  // 5. M. HAIKAL MALILANG : C03 s/d B02 (4 mesin: C03, C04, B01, B02)
+  add('pagi', 'emp-haikal', ['mach-c03', 'mach-c04', 'mach-b01', 'mach-b02']);
+  // 6. NITA RESTIANA : B04 s/d B06 (3 mesin: B04, B05, B06)
+  add('pagi', 'emp-nita', ['mach-b04', 'mach-b05', 'mach-b06']);
+  // 7. DEA IKA P : B07 s/d B09 +C5 (4 mesin: B07, B08, B09, C05)
+  add('pagi', 'emp-dea', ['mach-b07', 'mach-b08', 'mach-b09', 'mach-c05']);
+
+  // SIANG:
+  // 1. SISWANTINI CATUR P : A01 s/d A03 (3 mesin)
+  add('siang', 'emp-siswantini', ['mach-a01', 'mach-a02', 'mach-a03']);
+  // 2. AYU WULANDARI : A04 s/d A06 (3 mesin)
+  add('siang', 'emp-ayu-w', ['mach-a04', 'mach-a05', 'mach-a06']);
+  // 3. HARI ENDAH : A07 s/d A09 (3 mesin)
+  add('siang', 'emp-hari', ['mach-a07', 'mach-a08', 'mach-a09']);
+  // 4. Y. BRILLISANTO : A10 s/d A12 (3 mesin)
+  add('siang', 'emp-brilli', ['mach-a10', 'mach-a11', 'mach-a12']);
+  // 5. AYU PUSPITA R : C01 s/d C03 (3 mesin)
+  add('siang', 'emp-ayu-p', ['mach-c01', 'mach-c02', 'mach-c03']);
+  // 6. APRILLIA DWI N : C04 s/d B02 (3 mesin: C04, B01, B02)
+  add('siang', 'emp-aprillia', ['mach-c04', 'mach-b01', 'mach-b02']);
+  // 7. RINI WULANDARI : B03, B04, B07 (3 mesin)
+  add('siang', 'emp-rini', ['mach-b03', 'mach-b04', 'mach-b07']);
+  // 8. NOVIALITA A : B08, B09 (2 mesin)
+  add('siang', 'emp-novialita', ['mach-b08', 'mach-b09']);
+
+  return assignments;
+}
+
+
+

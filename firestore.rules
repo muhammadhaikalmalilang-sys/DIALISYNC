@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Koleksi data operasional unit Hemodialisa
+    // Mengizinkan staf membaca dan menyinkronkan jadwal, mesin, dan tugas secara real-time
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
