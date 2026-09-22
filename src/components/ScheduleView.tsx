@@ -2130,6 +2130,12 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                   <div className="flex items-start space-x-2">
                     <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                     <span>
+                      <strong>Anti-Kelelahan &amp; Pola Blok Teratur:</strong> Dilarang keras pola selang-seling 1-harian (<em>P S P S P S L</em> &amp; <em>S P S P S P L</em>) serta pola monoton tanpa variasi (<em>P P P P P P L</em> &amp; <em>S S S S S S L</em>).
+                    </span>
+                  </div>
+                  <div className="flex items-start space-x-2">
+                    <Check className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>
                       <strong>Dokter HD Manual:</strong> Jadwal dokter TIDAK digenerate otomatis; dokter diatur secara manual oleh admin/karu.
                     </span>
                   </div>

@@ -50,6 +50,128 @@ export function getTodayDateString(): string {
  *    - Menggunakan sistem blok shift (2-3 hari berturut-turut pada shift yang sama) dan
  *      mencegah transisi langsung Siang -> Pagi (S -> P) tanpa hari libur/Minggu agar durasi istirahat cukup.
  */
+/**
+ * Valid weekly block patterns for full 6 working days (Senin s/d Sabtu).
+ * Setiap pola menjamin:
+ * 1. BUKAN P S P S P S L (tidak ada selang-seling 1 harian)
+ * 2. BUKAN S P S P S P L (tidak ada selang-seling 1 harian)
+ * 3. BUKAN P P P P P P L (memiliki minimal 2 shift siang)
+ * 4. BUKAN S S S S S S L (memiliki minimal 2 shift pagi)
+ * 5. Menggunakan blok shift (minimal 2 hari berurutan pada shift yang sama)
+ */
+const VALID_6DAY_PATTERNS: ShiftType[][] = [
+  // 3 Pagi, 3 Siang (Keseimbangan 50:50)
+  ['pagi', 'pagi', 'pagi', 'siang', 'siang', 'siang'], // Pola 0: Mon-Wed P, Thu-Sat S
+  ['siang', 'siang', 'siang', 'pagi', 'pagi', 'pagi'], // Pola 1: Mon-Wed S, Thu-Sat P
+  
+  // 2 Pagi, 4 Siang (Sesuai rasio perawat Pagi < Siang)
+  ['pagi', 'pagi', 'siang', 'siang', 'siang', 'siang'], // Pola 2: Mon-Tue P, Wed-Sat S
+  ['siang', 'siang', 'pagi', 'pagi', 'siang', 'siang'], // Pola 3: Mon-Tue S, Wed-Thu P, Fri-Sat S
+  ['siang', 'siang', 'siang', 'siang', 'pagi', 'pagi'], // Pola 4: Mon-Thu S, Fri-Sat P
+
+  // 4 Pagi, 2 Siang
+  ['pagi', 'pagi', 'pagi', 'pagi', 'siang', 'siang'], // Pola 5: Mon-Thu P, Fri-Sat S
+  ['siang', 'siang', 'pagi', 'pagi', 'pagi', 'pagi'], // Pola 6: Mon-Tue S, Wed-Sat P
+  ['pagi', 'pagi', 'siang', 'siang', 'pagi', 'pagi'], // Pola 7: Mon-Tue P, Wed-Thu S, Fri-Sat P
+];
+
+/**
+ * Valid block patterns for partial weeks (1 to 5 working days)
+ */
+function getValidPartialPatterns(numDays: number): ShiftType[][] {
+  switch (numDays) {
+    case 5:
+      return [
+        ['pagi', 'pagi', 'pagi', 'siang', 'siang'],
+        ['siang', 'siang', 'pagi', 'pagi', 'pagi'],
+        ['pagi', 'pagi', 'siang', 'siang', 'siang'],
+        ['siang', 'siang', 'siang', 'pagi', 'pagi'],
+        ['siang', 'siang', 'pagi', 'pagi', 'siang'],
+      ];
+    case 4:
+      return [
+        ['pagi', 'pagi', 'siang', 'siang'],
+        ['siang', 'siang', 'pagi', 'pagi'],
+        ['pagi', 'pagi', 'pagi', 'siang'],
+        ['siang', 'siang', 'siang', 'pagi'],
+      ];
+    case 3:
+      return [
+        ['pagi', 'pagi', 'siang'],
+        ['siang', 'siang', 'pagi'],
+        ['pagi', 'siang', 'siang'],
+        ['siang', 'pagi', 'pagi'],
+      ];
+    case 2:
+      return [
+        ['pagi', 'pagi'],
+        ['siang', 'siang'],
+        ['pagi', 'siang'],
+        ['siang', 'pagi'],
+      ];
+    case 1:
+      return [
+        ['pagi'],
+        ['siang'],
+      ];
+    default:
+      return [];
+  }
+}
+
+/**
+ * Validates whether a weekly sequence of 6 working days (Mon-Sat) matches any of the 4 forbidden patterns.
+ */
+export function isForbiddenWeeklySequence(shifts: ShiftType[]): { isForbidden: boolean; reason?: string } {
+  if (shifts.length < 6) return { isForbidden: false };
+  const s = shifts.slice(0, 6);
+
+  // 1. P S P S P S
+  if (
+    s[0] === 'pagi' && s[1] === 'siang' &&
+    s[2] === 'pagi' && s[3] === 'siang' &&
+    s[4] === 'pagi' && s[5] === 'siang'
+  ) {
+    return { isForbidden: true, reason: 'P S P S P S L (Selang-seling harian P-S)' };
+  }
+
+  // 2. S P S P S P
+  if (
+    s[0] === 'siang' && s[1] === 'pagi' &&
+    s[2] === 'siang' && s[3] === 'pagi' &&
+    s[4] === 'siang' && s[5] === 'pagi'
+  ) {
+    return { isForbidden: true, reason: 'S P S P S P L (Selang-seling harian S-P)' };
+  }
+
+  // 3. P P P P P P
+  if (s.every((x) => x === 'pagi')) {
+    return { isForbidden: true, reason: 'P P P P P P L (Monoton Pagi penuh tanpa Siang)' };
+  }
+
+  // 4. S S S S S S
+  if (s.every((x) => x === 'siang')) {
+    return { isForbidden: true, reason: 'S S S S S S L (Monoton Siang penuh tanpa Pagi)' };
+  }
+
+  return { isForbidden: false };
+}
+
+/**
+ * Generate monthly schedule adhering strictly to operational rules:
+ * 1. HARI MINGGU: Selalu LIBUR ('L') untuk seluruh staf (Kepala Ruang, Perawat).
+ * 2. KEPALA RUANG: Selalu SHIFT PAGI ('P') setiap hari Senin s/d Sabtu.
+ * 3. DOKTER: Diinput secara MANUAL (1 dokter bisa bertugas 2 shif Pagi & Siang).
+ * 4. GENERATE PERAWAT DENGAN POLA BLOK BEBAS KELELAHAN:
+ *    - Proporsi: Jumlah perawat shift pagi LEBIH SEDIKIT daripada shift siang (Pagi < Siang).
+ *    - Keseimbangan Beban Kerja (Fair & Balanced): Total shif Pagi & Siang terbagi adil merata.
+ *    - ATURAN KETAT MINGGUAN:
+ *      1. Dalam satu minggu DILARANG: P S P S P S L
+ *      2. Dalam satu minggu DILARANG: S P S P S P L
+ *      3. Dalam satu minggu DILARANG: P P P P P P L
+ *      4. Dalam satu minggu DILARANG: S S S S S S L
+ *    - Menggunakan sistem blok shift teratur (kombinasi 2-4 hari berturut-turut pada shift yang sama).
+ */
 export function generateMonthlySchedule(
   year: number,
   month: number, // 0-indexed
@@ -78,38 +200,8 @@ export function generateMonthlySchedule(
 
   const newSchedules: ShiftSchedule[] = [...doctorSchedules];
 
-  // Tracker for nurses to ensure fair cumulative workload, smooth block shifts,
-  // and strictly prevent repeating P-S oscillations within the same week.
-  // Rule: A nurse may work Pagi then Siang next day, but once they transition to Siang in a week,
-  // they remain on Siang until Sunday rest (no zigzagging back to Pagi in the same week).
-  const nurseState: Record<
-    string,
-    {
-      pagiCount: number;
-      siangCount: number;
-      lastShift?: ShiftType;
-      consecutiveCount: number;
-      workedSiangThisWeek: boolean;
-    }
-  > = {};
-
-  nurses.forEach((n) => {
-    nurseState[n.id] = {
-      pagiCount: 0,
-      siangCount: 0,
-      lastShift: undefined,
-      consecutiveCount: 0,
-      workedSiangThisWeek: false,
-    };
-  });
-
-  const totalNurses = nurses.length;
-  // Strict rule: morningCount < afternoonCount
-  const morningCount =
-    totalNurses <= 2 ? 1 : Math.floor((totalNurses - 1) / 2);
-
+  // 1. Jadwal Hari Minggu: Libur Otomatis untuk Semua Staf
   days.forEach((day) => {
-    // 1. RULE: HARI MINGGU = LIBUR UNTUK SEMUA STAF
     if (day.isSunday) {
       activeEmployees.forEach((emp) => {
         if (emp.role === 'dokter') {
@@ -141,144 +233,347 @@ export function generateMonthlySchedule(
           note: 'Libur Rutin Hari Minggu (Unit HD Tutup)',
         });
       });
-
-      // Reset consecutive working streak & weekly shift transition flag on Sunday
-      nurses.forEach((nurse) => {
-        if (nurseState[nurse.id]) {
-          nurseState[nurse.id].lastShift = 'libur';
-          nurseState[nurse.id].consecutiveCount = 0;
-          nurseState[nurse.id].workedSiangThisWeek = false;
-        }
-      });
-      return;
-    }
-
-    // 2. RULE: KEPALA RUANG = SHIFT PAGI SETIAP HARI KERJA (SENIN - SABTU)
-    kepalaRuang.forEach((karu) => {
-      const key = `${karu.id}_${day.dateStr}`;
-      if (preserveCustomOverrides && overrideMap.has(key)) {
-        newSchedules.push(overrideMap.get(key)!);
-        return;
-      }
-
-      newSchedules.push({
-        id: key,
-        employeeId: karu.id,
-        date: day.dateStr,
-        shift: 'pagi',
-        note: 'Kepala Ruangan (Shift Pagi Rutin)',
-      });
-    });
-
-    // 3. RULE: DOKTER JAGA = MANUAL (bisa 2 shift sekaligus)
-
-    // 4. RULE: PERAWAT HEMODIALISA
-    // Pembagian proporsional: Pagi < Siang, blok shift teratur, tanpa pola selang-seling harian P-S-P-S
-    if (totalNurses > 0) {
-      // Check any nurses with custom overrides for this date
-      const overriddenNurseIds = new Set<string>();
-      let morningAssigned = 0;
-
-      nurses.forEach((nurse) => {
-        const key = `${nurse.id}_${day.dateStr}`;
+    } else {
+      // Kepala Ruangan: Selalu Pagi Senin - Sabtu
+      kepalaRuang.forEach((karu) => {
+        const key = `${karu.id}_${day.dateStr}`;
         if (preserveCustomOverrides && overrideMap.has(key)) {
-          overriddenNurseIds.add(nurse.id);
-          const overrideItem = overrideMap.get(key)!;
-          newSchedules.push(overrideItem);
-          if (overrideItem.shift === 'pagi') morningAssigned++;
-        }
-      });
-
-      const remainingNurses = nurses.filter((n) => !overriddenNurseIds.has(n.id));
-      const neededMorning = Math.max(0, morningCount - morningAssigned);
-
-      // Calculate average pagi count so far for balance deficit scoring
-      const avgPagi =
-        remainingNurses.reduce((sum, n) => sum + (nurseState[n.id]?.pagiCount || 0), 0) /
-        (remainingNurses.length || 1);
-      const avgSiang =
-        remainingNurses.reduce((sum, n) => sum + (nurseState[n.id]?.siangCount || 0), 0) /
-        (remainingNurses.length || 1);
-
-      // Score each nurse for morning assignment:
-      // - If worked 'siang' earlier in this week OR yesterday: FORBIDDEN from morning today.
-      //   This allows Pagi -> Siang the next day in a week, but STRICTLY prevents repeating oscillations (P-S-P-S).
-      // - If worked 'pagi' yesterday: allowed to continue Pagi or transition to Siang.
-      // - Workload deficit: nurses with fewer morning shifts get prioritized to start/take Pagi.
-      const scoredCandidates = remainingNurses.map((nurse) => {
-        const st = nurseState[nurse.id];
-        let score = 0;
-
-        // Strict constraint: If nurse already worked Siang this week, they cannot take Pagi (prevents repeating P-S-P-S)
-        if (st.workedSiangThisWeek || st.lastShift === 'siang') {
-          score -= 100000;
-        } else if (st.lastShift === 'pagi') {
-          if (st.consecutiveCount === 1) {
-            // Allows either continuing Pagi or transitioning to Siang smoothly
-            score += 35;
-          } else if (st.consecutiveCount === 2) {
-            score += 15;
-          } else if (st.consecutiveCount >= 3) {
-            // After 3 days of morning, strongly encourage switching to Siang
-            score -= 30;
-          }
-        } else if (st.lastShift === 'libur' || !st.lastShift) {
-          // Fresh from Sunday off: eligible to start the week with Pagi
-          score += 25;
+          newSchedules.push(overrideMap.get(key)!);
+          return;
         }
 
-        // Workload equalization across the month:
-        // Nurses with fewer morning shifts get higher priority for morning
-        score += (avgPagi - st.pagiCount) * 15;
-        score += (st.siangCount - avgSiang) * 5;
-
-        return { nurse, score };
-      });
-
-      // Sort descending by score
-      scoredCandidates.sort((a, b) => b.score - a.score);
-
-      const assignedMorningIds = new Set<string>();
-      for (let i = 0; i < neededMorning && i < scoredCandidates.length; i++) {
-        assignedMorningIds.add(scoredCandidates[i].nurse.id);
-      }
-
-      // Assign shifts and update state
-      remainingNurses.forEach((nurse) => {
-        const isMorning = assignedMorningIds.has(nurse.id);
-        const shift: ShiftType = isMorning ? 'pagi' : 'siang';
-        const st = nurseState[nurse.id];
-
-        if (isMorning) {
-          st.pagiCount++;
-          if (st.lastShift === 'pagi') {
-            st.consecutiveCount++;
-          } else {
-            st.consecutiveCount = 1;
-          }
-          st.lastShift = 'pagi';
-        } else {
-          st.siangCount++;
-          // Mark that this nurse is on Siang for this week (no zigzagging back to Pagi until Sunday rest)
-          st.workedSiangThisWeek = true;
-          if (st.lastShift === 'siang') {
-            st.consecutiveCount++;
-          } else {
-            st.consecutiveCount = 1;
-          }
-          st.lastShift = 'siang';
-        }
-
-        const key = `${nurse.id}_${day.dateStr}`;
         newSchedules.push({
           id: key,
-          employeeId: nurse.id,
+          employeeId: karu.id,
           date: day.dateStr,
-          shift,
-          note: `${nurse.role === 'pj_shift' ? 'PJ Shift HD' : 'Perawat Pelaksana HD'} - Shift ${isMorning ? 'Pagi' : 'Siang'} (${morningCount} Pagi : ${totalNurses - morningCount} Siang)`,
+          shift: 'pagi',
+          note: 'Kepala Ruangan (Shift Pagi Rutin)',
         });
       });
     }
+  });
+
+  // 2. Generate Khusus Perawat HD
+  const totalNurses = nurses.length;
+  if (totalNurses === 0) {
+    return newSchedules;
+  }
+
+  // Strict hospital operational rule: morningCount < afternoonCount
+  const morningCount = totalNurses <= 2 ? 1 : Math.floor((totalNurses - 1) / 2);
+
+  // Group days of the month into calendar weeks (starting on Monday, ending on Sunday)
+  interface MonthWeek {
+    weekIndex: number;
+    days: typeof days;
+    workingDays: typeof days;
+  }
+
+  const calendarWeeks: MonthWeek[] = [];
+  let currentWeekDays: typeof days = [];
+
+  days.forEach((day) => {
+    currentWeekDays.push(day);
+    if (day.isSunday) {
+      calendarWeeks.push({
+        weekIndex: calendarWeeks.length,
+        days: currentWeekDays,
+        workingDays: currentWeekDays.filter((d) => !d.isSunday),
+      });
+      currentWeekDays = [];
+    }
+  });
+
+  if (currentWeekDays.length > 0) {
+    calendarWeeks.push({
+      weekIndex: calendarWeeks.length,
+      days: currentWeekDays,
+      workingDays: currentWeekDays.filter((d) => !d.isSunday),
+    });
+  }
+
+  // Cumulative state tracker for each nurse across the month
+  const nurseState: Record<
+    string,
+    {
+      pagiCount: number;
+      siangCount: number;
+    }
+  > = {};
+
+  nurses.forEach((n) => {
+    nurseState[n.id] = { pagiCount: 0, siangCount: 0 };
+  });
+
+  // Process each week using rotating block-shift allocation
+  calendarWeeks.forEach((week, weekIdx) => {
+    const workingDays = week.workingDays;
+    const numWorkingDays = workingDays.length;
+
+    if (numWorkingDays === 0) {
+      return;
+    }
+
+    // Sort nurses by cumulative pagiCount ascending to balance morning workload across the month
+    // Tie-break with consistent nurse index + week offset for smooth pattern variety
+    const sortedNurses = [...nurses].sort((a, b) => {
+      const diff = nurseState[a.id].pagiCount - nurseState[b.id].pagiCount;
+      if (diff !== 0) return diff;
+      return (nurses.indexOf(a) + weekIdx) % totalNurses - ((nurses.indexOf(b) + weekIdx) % totalNurses);
+    });
+
+    // Check pre-existing overrides for each nurse in this week
+    const nurseOverrides = new Map<string, Map<number, ShiftType>>();
+    workingDays.forEach((day, dayIndex) => {
+      sortedNurses.forEach((nurse) => {
+        const key = `${nurse.id}_${day.dateStr}`;
+        if (preserveCustomOverrides && overrideMap.has(key)) {
+          if (!nurseOverrides.has(nurse.id)) {
+            nurseOverrides.set(nurse.id, new Map());
+          }
+          nurseOverrides.get(nurse.id)!.set(dayIndex, overrideMap.get(key)!.shift);
+        }
+      });
+    });
+
+    const candidatePool =
+      numWorkingDays === 6
+        ? VALID_6DAY_PATTERNS
+        : getValidPartialPatterns(numWorkingDays);
+
+    // Nurse assigned shifts for this week: nurseId -> ShiftType[]
+    const weekAssignment = new Map<string, ShiftType[]>();
+
+    // CASE 1: Standard 12 Nurses, full 6-day week without conflicting overrides
+    // Uses the optimal closed-form rotating assignment where every day has EXACTLY 5 Pagi & 7 Siang,
+    // and NO nurse ever has P-S-P-S-P-S-L, S-P-S-P-S-P-L, P-P-P-P-P-P-L, or S-S-S-S-S-S-L.
+    const hasOverridesThisWeek = nurseOverrides.size > 0;
+    if (totalNurses === 12 && numWorkingDays === 6 && !hasOverridesThisWeek) {
+      // 3 nurses: Pattern 0 ('P P P S S S') -> 3 Pagi
+      // 3 nurses: Pattern 1 ('S S S P P P') -> 3 Pagi
+      // 2 nurses: Pattern 2 ('P P S S S S') -> 2 Pagi
+      // 2 nurses: Pattern 3 ('S S P P S S') -> 2 Pagi
+      // 2 nurses: Pattern 4 ('S S S S P P') -> 2 Pagi
+      // Daily Pagi sum:
+      // Mon: 3 + 0 + 2 + 0 + 0 = 5
+      // Tue: 3 + 0 + 2 + 0 + 0 = 5
+      // Wed: 3 + 0 + 0 + 2 + 0 = 5
+      // Thu: 0 + 3 + 0 + 2 + 0 = 5
+      // Fri: 0 + 3 + 0 + 0 + 2 = 5
+      // Sat: 0 + 3 + 0 + 0 + 2 = 5
+      const patternSlots: ShiftType[][] = [
+        VALID_6DAY_PATTERNS[0], // 0: P P P S S S (3P)
+        VALID_6DAY_PATTERNS[0], // 1: P P P S S S (3P)
+        VALID_6DAY_PATTERNS[0], // 2: P P P S S S (3P)
+        VALID_6DAY_PATTERNS[1], // 3: S S S P P P (3P)
+        VALID_6DAY_PATTERNS[1], // 4: S S S P P P (3P)
+        VALID_6DAY_PATTERNS[1], // 5: S S S P P P (3P)
+        VALID_6DAY_PATTERNS[2], // 6: P P S S S S (2P)
+        VALID_6DAY_PATTERNS[2], // 7: P P S S S S (2P)
+        VALID_6DAY_PATTERNS[3], // 8: S S P P S S (2P)
+        VALID_6DAY_PATTERNS[3], // 9: S S P P S S (2P)
+        VALID_6DAY_PATTERNS[4], // 10: S S S S P P (2P)
+        VALID_6DAY_PATTERNS[4], // 11: S S S S P P (2P)
+      ];
+
+      sortedNurses.forEach((nurse, idx) => {
+        weekAssignment.set(nurse.id, [...patternSlots[idx]]);
+      });
+    } else {
+      // CASE 2: General solver for any nurse count, partial weeks, or custom overrides
+      // Step A: Initial assignment from candidate pool
+      sortedNurses.forEach((nurse, idx) => {
+        const overrides = nurseOverrides.get(nurse.id);
+        let bestPattern: ShiftType[] | null = null;
+        let bestMatchScore = -999;
+
+        // Try candidate patterns that best match nurse overrides and rotation
+        const preferredIndices = [
+          (idx + weekIdx * 2) % candidatePool.length,
+          (idx + 1) % candidatePool.length,
+          (idx + 3) % candidatePool.length,
+        ];
+
+        for (const pIdx of preferredIndices) {
+          const pat = candidatePool[pIdx] || candidatePool[0];
+          let match = 0;
+          let conflict = false;
+
+          if (overrides) {
+            overrides.forEach((ovShift, dIdx) => {
+              if (pat[dIdx] === ovShift) {
+                match += 10;
+              } else {
+                conflict = true;
+              }
+            });
+          }
+
+          if (!conflict && match >= bestMatchScore) {
+            bestPattern = pat;
+            bestMatchScore = match;
+          }
+        }
+
+        if (!bestPattern) {
+          // If no candidate directly matched custom overrides, create a customized block pattern
+          const basePattern = [...(candidatePool[idx % candidatePool.length] || candidatePool[0])];
+          if (overrides) {
+            overrides.forEach((ovShift, dIdx) => {
+              basePattern[dIdx] = ovShift;
+            });
+          }
+          bestPattern = basePattern;
+        }
+
+        weekAssignment.set(nurse.id, [...bestPattern]);
+      });
+
+      // Step B: Quota balancing per day (reach exact morningCount per day)
+      for (let dayIdx = 0; dayIdx < numWorkingDays; dayIdx++) {
+        let currentMorningNurses = sortedNurses.filter(
+          (n) => weekAssignment.get(n.id)![dayIdx] === 'pagi'
+        );
+        let neededChanges = currentMorningNurses.length - morningCount;
+
+        if (neededChanges > 0) {
+          // Too many morning shifts on this day -> change some to siang
+          // Pick nurses who don't have override on this day, prioritized by highest cumulative pagiCount
+          const candidatesToSiang = sortedNurses
+            .filter((n) => {
+              const hasOv = nurseOverrides.get(n.id)?.has(dayIdx);
+              return !hasOv && weekAssignment.get(n.id)![dayIdx] === 'pagi';
+            })
+            .sort(
+              (a, b) =>
+                nurseState[b.id].pagiCount - nurseState[a.id].pagiCount
+            );
+
+          for (let c = 0; c < neededChanges && c < candidatesToSiang.length; c++) {
+            weekAssignment.get(candidatesToSiang[c].id)![dayIdx] = 'siang';
+          }
+        } else if (neededChanges < 0) {
+          // Too few morning shifts on this day -> change some to pagi
+          // Pick nurses who don't have override on this day, prioritized by lowest cumulative pagiCount
+          const deficit = Math.abs(neededChanges);
+          const candidatesToPagi = sortedNurses
+            .filter((n) => {
+              const hasOv = nurseOverrides.get(n.id)?.has(dayIdx);
+              return !hasOv && weekAssignment.get(n.id)![dayIdx] === 'siang';
+            })
+            .sort(
+              (a, b) =>
+                nurseState[a.id].pagiCount - nurseState[b.id].pagiCount
+            );
+
+          for (let c = 0; c < deficit && c < candidatesToPagi.length; c++) {
+            weekAssignment.get(candidatesToPagi[c].id)![dayIdx] = 'pagi';
+          }
+        }
+      }
+    }
+
+    // Step C: STRICT ENFORCEMENT & SAFETY REPAIR PASS FOR 6-DAY WEEKS
+    // Checks that NO nurse ever has:
+    // 1. P S P S P S L
+    // 2. S P S P S P L
+    // 3. P P P P P P L
+    // 4. S S S S S S L
+    if (numWorkingDays === 6) {
+      sortedNurses.forEach((nurse) => {
+        const shifts = weekAssignment.get(nurse.id)!;
+        const check = isForbiddenWeeklySequence(shifts);
+
+        if (check.isForbidden) {
+          // Find a replacement block pattern that is completely valid
+          // If nurse has all Pagi (P P P P P P), give them 2 or 3 Siang shifts
+          if (shifts.every((x) => x === 'pagi')) {
+            // Swap days 3, 4, 5 with a nurse who currently has Siang on those days
+            for (const dIdx of [3, 4, 5]) {
+              if (nurseOverrides.get(nurse.id)?.has(dIdx)) continue;
+              const partner = sortedNurses.find(
+                (other) =>
+                  other.id !== nurse.id &&
+                  !nurseOverrides.get(other.id)?.has(dIdx) &&
+                  weekAssignment.get(other.id)![dIdx] === 'siang'
+              );
+              if (partner) {
+                weekAssignment.get(nurse.id)![dIdx] = 'siang';
+                weekAssignment.get(partner.id)![dIdx] = 'pagi';
+              }
+            }
+          } else if (shifts.every((x) => x === 'siang')) {
+            // If nurse has all Siang (S S S S S S), give them 2 or 3 Pagi shifts
+            // Swap days 0, 1, 2 with a nurse who currently has Pagi on those days
+            for (const dIdx of [0, 1, 2]) {
+              if (nurseOverrides.get(nurse.id)?.has(dIdx)) continue;
+              const partner = sortedNurses.find(
+                (other) =>
+                  other.id !== nurse.id &&
+                  !nurseOverrides.get(other.id)?.has(dIdx) &&
+                  weekAssignment.get(other.id)![dIdx] === 'pagi'
+              );
+              if (partner) {
+                weekAssignment.get(nurse.id)![dIdx] = 'pagi';
+                weekAssignment.get(partner.id)![dIdx] = 'siang';
+              }
+            }
+          } else {
+            // Alternating patterns (P S P S P S or S P S P S P)
+            // Repair into contiguous blocks (e.g. [P, P, P, S, S, S] or [S, S, S, P, P, P])
+            const targetBlock: ShiftType[] =
+              shifts[0] === 'pagi'
+                ? ['pagi', 'pagi', 'pagi', 'siang', 'siang', 'siang']
+                : ['siang', 'siang', 'siang', 'pagi', 'pagi', 'pagi'];
+
+            for (let dIdx = 0; dIdx < 6; dIdx++) {
+              if (nurseOverrides.get(nurse.id)?.has(dIdx)) continue;
+              const desired = targetBlock[dIdx];
+              if (weekAssignment.get(nurse.id)![dIdx] !== desired) {
+                // Swap with a partner nurse on day dIdx
+                const partner = sortedNurses.find(
+                  (other) =>
+                    other.id !== nurse.id &&
+                    !nurseOverrides.get(other.id)?.has(dIdx) &&
+                    weekAssignment.get(other.id)![dIdx] === desired
+                );
+                if (partner) {
+                  const temp = weekAssignment.get(nurse.id)![dIdx];
+                  weekAssignment.get(nurse.id)![dIdx] = desired;
+                  weekAssignment.get(partner.id)![dIdx] = temp;
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Step D: Commit week schedules and update cumulative state
+    workingDays.forEach((day, dayIndex) => {
+      sortedNurses.forEach((nurse) => {
+        const assignedShift = weekAssignment.get(nurse.id)![dayIndex];
+        const key = `${nurse.id}_${day.dateStr}`;
+
+        if (assignedShift === 'pagi') {
+          nurseState[nurse.id].pagiCount++;
+        } else {
+          nurseState[nurse.id].siangCount++;
+        }
+
+        if (preserveCustomOverrides && overrideMap.has(key)) {
+          newSchedules.push(overrideMap.get(key)!);
+        } else {
+          newSchedules.push({
+            id: key,
+            employeeId: nurse.id,
+            date: day.dateStr,
+            shift: assignedShift,
+            note: `${nurse.role === 'pj_shift' ? 'PJ Shift HD' : 'Perawat Pelaksana HD'} - Shift ${assignedShift === 'pagi' ? 'Pagi' : 'Siang'} (${morningCount} Pagi : ${totalNurses - morningCount} Siang)`,
+          });
+        }
+      });
+    });
   });
 
   return newSchedules;
