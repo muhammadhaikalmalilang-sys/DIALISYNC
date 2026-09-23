@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   UserAccount, 
   ShiftSchedule, 
@@ -6,7 +6,13 @@ import {
   SHIFT_DEFINITIONS,
   SpecialTask,
   SpecialTaskCategory,
-  SPECIAL_TASK_DEFINITIONS
+  SPECIAL_TASK_DEFINITIONS,
+  HDMachine,
+  MachineAssignment,
+  AppSettings,
+  Machine,
+  Nurse,
+  ShiftAssignment
 } from '../types';
 import { 
   getDaysInMonth, 
@@ -42,9 +48,22 @@ import {
   ListFilter,
   FileDown,
   Download,
-  Loader2
+  Loader2,
+  Cpu,
+  FileSpreadsheet,
+  Share2,
+  Send,
+  ExternalLink,
+  RefreshCw
 } from 'lucide-react';
 import { exportScheduleToPdf, printScheduleDirectly } from '../utils/pdfExport';
+import { storage } from '../utils/storage';
+import { ImportScheduleModal } from './ImportScheduleModal';
+import { GoogleScriptGuideModal } from './GoogleScriptGuideModal';
+import { RegenerateMachineAllocationModal } from './RegenerateMachineAllocationModal';
+import { HeadNurseReportModal } from './HeadNurseReportModal';
+import { SpecialDutyBadge } from './SpecialDutyBadge';
+import { GoogleSheetsService } from '../domain/GoogleSheetsService';
 
 interface ScheduleViewProps {
   currentUser: UserAccount;
@@ -52,6 +71,11 @@ interface ScheduleViewProps {
   schedules: ShiftSchedule[];
   specialTasks: SpecialTask[];
   onUpdateSchedule: (newSchedules: ShiftSchedule[]) => void;
+  machines?: HDMachine[];
+  machineAssignments?: MachineAssignment[];
+  onUpdateMachineAssignments?: (newAssignments: MachineAssignment[]) => void;
+  settings?: AppSettings;
+  onUpdateSettings?: (newSettings: AppSettings) => void;
 }
 
 export const ScheduleView: React.FC<ScheduleViewProps> = ({
@@ -60,6 +84,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   schedules,
   specialTasks,
   onUpdateSchedule,
+  machines = [],
+  machineAssignments = [],
+  onUpdateMachineAssignments,
+  settings,
+  onUpdateSettings,
 }) => {
   // Current active month (0-indexed: 8 = September 2026)
   const [selectedYear, setSelectedYear] = useState<number>(2026);
@@ -81,6 +110,14 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
     note?: string 
   } | null>(null);
 
+  // New Modals state from reference repo
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showGoogleScriptModal, setShowGoogleScriptModal] = useState(false);
+  const [showRegenerateAllocationModal, setShowRegenerateAllocationModal] = useState(false);
+  const [showHeadNurseReportModal, setShowHeadNurseReportModal] = useState(false);
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [activeDateForReport, setActiveDateForReport] = useState<string>(() => getTodayDateString());
+
   // Doctor Scheduling state (Simplified: 1 Doctor per Shift, or 1 Doctor covering 2 Shifts)
   const [selectedDoctorDate, setSelectedDoctorDate] = useState<string>(() => getTodayDateString());
   const [showDoctorMonthlyList, setShowDoctorMonthlyList] = useState<boolean>(false);
@@ -95,6 +132,223 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
 
   // Days in selected month
   const days = getDaysInMonth(selectedYear, selectedMonth);
+
+  // Month prefix string: e.g. "2026-09"
+  const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+
+  const effectiveSettings = useMemo(() => {
+    return settings || storage.getSettings();
+  }, [settings]);
+
+  // Domain adapted machines & nurses
+  const domainMachines: Machine[] = useMemo(() => {
+    return (machines || []).map((m, idx) => ({
+      id: isNaN(Number(m.id)) ? idx + 1 : Number(m.id),
+      code: m.code,
+      name: `Mesin HD ${m.code}`,
+      brandModel: (m as any).brandModel || m.model || 'Nipro / Fresenius',
+      category: ((m as any).category || 'REGULER') as any,
+      status: (m.status === 'siap' || m.status === 'dipakai' || m.status === 'AKTIF') ? 'AKTIF' : (m.status === 'maintenance' || m.status === 'MAINTENANCE') ? 'MAINTENANCE' : 'RUSAK',
+      bay: m.bay || m.zone || 'Bay A',
+      operationalShift: (m as any).operationalShift || 'ALL',
+      notes: m.notes,
+    }));
+  }, [machines]);
+
+  const domainNurses: Nurse[] = useMemo(() => {
+    return employees
+      .filter((e) => e.role !== 'dokter')
+      .map((e, idx) => ({
+        id: isNaN(Number(e.id)) ? idx + 1 : Number(e.id),
+        name: e.name,
+        nip: e.nip,
+        phone: e.phone,
+        role: e.role === 'kepala_ruangan' ? 'KARU' : e.role === 'pj_shift' ? 'KATIM' : 'PELAKSANA',
+        isActive: e.status === 'aktif',
+        skillLevel: e.skillLevel || 'Senior',
+        specialDuty: e.specialDuty,
+      }));
+  }, [employees]);
+
+  // Domain monthly assignments
+  const domainMonthlyAssignments: ShiftAssignment[] = useMemo(() => {
+    return schedules
+      .filter((s) => s.date.startsWith(monthPrefix))
+      .map((s, idx) => {
+        const emp = employees.find((e) => e.id === s.employeeId);
+        const st = s.shift === 'pagi' ? 'PAGI' : s.shift === 'siang' ? 'SIANG' : 'LIBUR';
+        const assignedIds = (machineAssignments || [])
+          .filter((ma) => (ma.nurseId === s.employeeId || (ma as any).employeeId === s.employeeId) && ma.date === s.date)
+          .map((ma) => ma.machineId);
+
+        return {
+          id: s.id,
+          date: s.date,
+          nurseId: isNaN(Number(s.employeeId)) ? idx + 1 : Number(s.employeeId),
+          nurseName: emp?.name || s.employeeId,
+          nursePhone: emp?.phone || '',
+          shiftType: st as any,
+          assignedMachineIds: assignedIds,
+          isLeader: emp?.role === 'kepala_ruangan' || emp?.role === 'pj_shift',
+          isWhatsAppSent: false,
+          notes: s.note || '',
+          specialDuty: emp?.specialDuty || null,
+        };
+      });
+  }, [schedules, employees, machineAssignments, monthPrefix]);
+
+  // Daily assignments for HeadNurseReportModal
+  const currentDailyAssignments: ShiftAssignment[] = useMemo(() => {
+    const effectiveDate = days.find((d) => d.dateStr === activeDateForReport)?.dateStr || days[0]?.dateStr || getTodayDateString();
+
+    return schedules
+      .filter((s) => s.date === effectiveDate)
+      .map((s, idx) => {
+        const emp = employees.find((e) => e.id === s.employeeId);
+        const st = s.shift === 'pagi' ? 'PAGI' : s.shift === 'siang' ? 'SIANG' : 'LIBUR';
+        const assignedIds = (machineAssignments || [])
+          .filter((ma) => (ma.nurseId === s.employeeId || (ma as any).employeeId === s.employeeId) && ma.date === effectiveDate)
+          .map((ma) => ma.machineId);
+
+        return {
+          id: s.id,
+          date: s.date,
+          nurseId: isNaN(Number(s.employeeId)) ? idx + 1 : Number(s.employeeId),
+          nurseName: emp?.name || s.employeeId,
+          nursePhone: emp?.phone || '',
+          shiftType: st as any,
+          assignedMachineIds: assignedIds,
+          isLeader: emp?.role === 'kepala_ruangan' || emp?.role === 'pj_shift',
+          isWhatsAppSent: false,
+          notes: s.note || '',
+          specialDuty: emp?.specialDuty || null,
+        };
+      });
+  }, [schedules, employees, machineAssignments, activeDateForReport, days]);
+
+  const handleImportCompleted = (
+    importedAssignments: ShiftAssignment[],
+    targetMonth: string,
+    replaceExisting: boolean = true
+  ) => {
+    const newShiftSchedules: ShiftSchedule[] = importedAssignments.map((a) => {
+      const emp = employees.find(
+        (e) => String(e.id) === String(a.nurseId) || e.name.toLowerCase() === a.nurseName.toLowerCase()
+      );
+      const employeeId = emp ? emp.id : String(a.nurseId);
+      let shiftLower: ShiftType = 'pagi';
+      const st = (a.shiftType || '').toLowerCase();
+      if (st.includes('pagi') && st.includes('siang')) shiftLower = 'pagi_siang';
+      else if (st === 'siang') shiftLower = 'siang';
+      else if (st === 'pagi') shiftLower = 'pagi';
+      else if (st === 'libur') shiftLower = 'libur';
+      else if (st === 'cuti') shiftLower = 'cuti';
+      else if (st === 'izin') shiftLower = 'izin';
+      else if (st === 'sakit') shiftLower = 'sakit';
+
+      return {
+        id: `${employeeId}_${a.date}`,
+        employeeId,
+        date: a.date,
+        shift: shiftLower,
+        isCustomOverride: true,
+      };
+    });
+
+    let updatedSchedules = [...schedules];
+    if (replaceExisting) {
+      updatedSchedules = updatedSchedules.filter((s) => !s.date.startsWith(targetMonth));
+    }
+    onUpdateSchedule([...updatedSchedules, ...newShiftSchedules]);
+
+    if (onUpdateMachineAssignments) {
+      const newMachineAssignments: MachineAssignment[] = [];
+      importedAssignments.forEach((a) => {
+        if (a.assignedMachineIds && a.assignedMachineIds.length > 0) {
+          const emp = employees.find(
+            (e) => String(e.id) === String(a.nurseId) || e.name.toLowerCase() === a.nurseName.toLowerCase()
+          );
+          const employeeId = emp ? emp.id : String(a.nurseId);
+          const shiftStr: 'pagi' | 'siang' = (a.shiftType || '').toLowerCase() === 'siang' ? 'siang' : 'pagi';
+
+          a.assignedMachineIds.forEach((mId) => {
+            newMachineAssignments.push({
+              id: `${employeeId}_${a.date}_${shiftStr}_${mId}`,
+              machineId: String(mId),
+              nurseId: employeeId,
+              date: a.date,
+              shift: shiftStr,
+            });
+          });
+        }
+      });
+
+      let updatedMA = [...(machineAssignments || [])];
+      if (replaceExisting) {
+        updatedMA = updatedMA.filter((m) => !m.date.startsWith(targetMonth));
+      }
+      onUpdateMachineAssignments([...updatedMA, ...newMachineAssignments]);
+    }
+  };
+
+  const handleReallocationCompleted = (
+    updatedAssignments: ShiftAssignment[],
+    summaryMessage: string
+  ) => {
+    if (onUpdateMachineAssignments) {
+      const newMachineAssignments: MachineAssignment[] = [];
+      updatedAssignments.forEach((a) => {
+        if (a.assignedMachineIds && a.assignedMachineIds.length > 0) {
+          const emp = employees.find(
+            (e) => String(e.id) === String(a.nurseId) || e.name.toLowerCase() === a.nurseName.toLowerCase()
+          );
+          const employeeId = emp ? emp.id : String(a.nurseId);
+          const shiftStr: 'pagi' | 'siang' = (a.shiftType || '').toLowerCase() === 'siang' ? 'siang' : 'pagi';
+
+          a.assignedMachineIds.forEach((mId) => {
+            newMachineAssignments.push({
+              id: `${employeeId}_${a.date}_${shiftStr}_${mId}`,
+              machineId: String(mId),
+              nurseId: employeeId,
+              date: a.date,
+              shift: shiftStr,
+            });
+          });
+        }
+      });
+
+      const datesToReplace = new Set(updatedAssignments.map((a) => a.date));
+      const remainingMA = (machineAssignments || []).filter((ma) => !datesToReplace.has(ma.date));
+      onUpdateMachineAssignments([...remainingMA, ...newMachineAssignments]);
+    }
+    alert(summaryMessage);
+  };
+
+  const handleSyncToGoogleSheets = async () => {
+    if (!effectiveSettings?.googleSheetWebhookUrl) {
+      setShowGoogleScriptModal(true);
+      return;
+    }
+    setIsSyncingSheets(true);
+    try {
+      const result = await GoogleSheetsService.syncToGoogleSheets(
+        effectiveSettings.googleSheetWebhookUrl,
+        monthPrefix,
+        domainNurses,
+        domainMachines,
+        domainMonthlyAssignments
+      );
+      if (result.isSuccess) {
+        alert('Sinkronisasi Google Sheets berhasil! Seluruh data jadwal dan alokasi mesin telah terkirim.');
+      } else {
+        alert('Gagal sinkron: ' + result.message);
+      }
+    } catch (e: any) {
+      alert('Terjadi kesalahan saat menghubungi Webhook: ' + (e?.message || e));
+    } finally {
+      setIsSyncingSheets(false);
+    }
+  };
 
   const monthNames = [
     'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -290,7 +544,6 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
   const isPjShift = currentUser.role === 'pj_shift';
   const canEdit = isAdmin || isKaru || isPjShift;
 
-  const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
   const currentMonthSchedules = schedules.filter((s) => s.date.startsWith(monthPrefix));
 
   // Separate Perawat (including Karu & PJ Shift) and Dokter, sorted strictly:
@@ -770,6 +1023,11 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
                                 <span className="text-[9px] font-bold text-blue-600">(Manual)</span>
                               )}
                             </div>
+                            {emp.specialDuty && (
+                              <div className="mt-0.5">
+                                <SpecialDutyBadge duty={emp.specialDuty} size="xs" />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -1656,6 +1914,57 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             </button>
           )}
 
+          {/* Atur Alokasi Mesin Button */}
+          {canEdit && (
+            <button
+              onClick={() => setShowRegenerateAllocationModal(true)}
+              className="px-3 py-2 bg-white/95 border border-indigo-200 hover:bg-indigo-50 text-indigo-800 rounded-xl text-xs font-bold shadow-2xs flex items-center space-x-1.5 transition min-h-[36px] active:scale-95 cursor-pointer"
+              title="Atur & Optimalkan Alokasi Mesin HD (Pagi / Siang / Sebulan)"
+            >
+              <Cpu className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span>Atur Mesin</span>
+            </button>
+          )}
+
+          {/* Import Jadwal Button */}
+          {canEdit && (
+            <button
+              onClick={() => setShowImportModal(true)}
+              className="px-3 py-2 bg-white/95 border border-emerald-300 hover:bg-emerald-50 text-emerald-800 rounded-xl text-xs font-bold shadow-2xs flex items-center space-x-1.5 transition min-h-[36px] active:scale-95 cursor-pointer"
+              title="Import Jadwal dari Excel (.xlsx), CSV, atau Google Spreadsheet"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>Import</span>
+            </button>
+          )}
+
+          {/* Google Sheets Sync Button */}
+          {canEdit && (
+            <button
+              onClick={handleSyncToGoogleSheets}
+              disabled={isSyncingSheets}
+              className="px-3 py-2 bg-white/95 border border-teal-300 hover:bg-teal-50 text-teal-800 rounded-xl text-xs font-bold shadow-2xs flex items-center space-x-1.5 transition min-h-[36px] active:scale-95 cursor-pointer disabled:opacity-50"
+              title="Sinkronisasi Jadwal ke Google Sheets Real-time"
+            >
+              {isSyncingSheets ? (
+                <Loader2 className="w-3.5 h-3.5 text-teal-600 animate-spin shrink-0" />
+              ) : (
+                <Share2 className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+              )}
+              <span>Sync Sheets</span>
+            </button>
+          )}
+
+          {/* Laporan Kepala Ruangan (WhatsApp) Button */}
+          <button
+            onClick={() => setShowHeadNurseReportModal(true)}
+            className="px-3 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center space-x-1.5 transition min-h-[36px] active:scale-95 cursor-pointer"
+            title="Kirim Laporan Harian Terpadu ke WhatsApp Direktur / Manajemen RS"
+          >
+            <Send className="w-3.5 h-3.5 text-white shrink-0" />
+            <span>Laporan Karu</span>
+          </button>
+
           {/* Cetak & PDF Button */}
           <button
             onClick={() => setShowPrintModal(true)}
@@ -2455,6 +2764,61 @@ export const ScheduleView: React.FC<ScheduleViewProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL IMPORT JADWAL (Excel / CSV / Google Sheets) */}
+      {showImportModal && (
+        <ImportScheduleModal
+          isOpen={showImportModal}
+          onClose={() => setShowImportModal(false)}
+          defaultMonth={monthPrefix}
+          nurses={domainNurses}
+          machines={domainMachines}
+          settings={settings}
+          onImportCompleted={handleImportCompleted}
+        />
+      )}
+
+      {/* MODAL REGENERASI ALOKASI MESIN (Pagi / Siang / Sebulan) */}
+      {showRegenerateAllocationModal && (
+        <RegenerateMachineAllocationModal
+          isOpen={showRegenerateAllocationModal}
+          onClose={() => setShowRegenerateAllocationModal(false)}
+          selectedDate={activeDateForReport}
+          currentMonth={monthPrefix}
+          nurses={domainNurses}
+          machines={domainMachines}
+          assignments={domainMonthlyAssignments}
+          onReallocationCompleted={handleReallocationCompleted}
+        />
+      )}
+
+      {/* MODAL LAPORAN KEPALA RUANGAN (WhatsApp) */}
+      {showHeadNurseReportModal && (
+        <HeadNurseReportModal
+          isOpen={showHeadNurseReportModal}
+          onClose={() => setShowHeadNurseReportModal(false)}
+          dailyAssignments={currentDailyAssignments}
+          machines={domainMachines}
+          selectedDate={activeDateForReport}
+          settings={effectiveSettings}
+          onUpdateSettings={onUpdateSettings}
+          doctorDuties={{
+            [activeDateForReport]: {
+              date: activeDateForReport,
+              pagiDoctorName: getDoctorForShiftAndDate(activeDateForReport, 'pagi')?.name,
+              siangDoctorName: getDoctorForShiftAndDate(activeDateForReport, 'siang')?.name,
+            },
+          }}
+        />
+      )}
+
+      {/* MODAL PANDUAN GOOGLE APPS SCRIPT WEBHOOK */}
+      {showGoogleScriptModal && (
+        <GoogleScriptGuideModal
+          isOpen={showGoogleScriptModal}
+          onClose={() => setShowGoogleScriptModal(false)}
+        />
       )}
     </div>
   );

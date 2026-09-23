@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserAccount, UserRole } from '../types';
+import { UserAccount, UserRole, ShiftSchedule, HDMachine, MachineAssignment, AppSettings } from '../types';
 import { SyncStatus } from '../services/cloudSync';
 import { 
   Activity, 
@@ -13,8 +13,10 @@ import {
   Layers,
   ChevronDown,
   CloudCheck,
-  Cloud
+  Cloud,
+  FileSpreadsheet
 } from 'lucide-react';
+import { HeaderGoogleSheetSync } from './HeaderGoogleSheetSync';
 
 interface NavbarProps {
   currentUser: UserAccount;
@@ -24,6 +26,16 @@ interface NavbarProps {
   onLogout: () => void;
   onSwitchUser: (user: UserAccount) => void;
   syncStatus?: SyncStatus;
+  settings?: AppSettings;
+  onUpdateSettings?: (newSettings: AppSettings) => void;
+  schedules?: ShiftSchedule[];
+  machines?: HDMachine[];
+  machineAssignments?: MachineAssignment[];
+  onUpdateSchedule?: (newSchedules: ShiftSchedule[]) => void;
+  onUpdateMachineAssignments?: (newAssignments: MachineAssignment[]) => void;
+  onUpdateEmployees?: (newEmployees: UserAccount[]) => void;
+  onUpdateMachines?: (newMachines: HDMachine[]) => void;
+  operationalDate?: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -34,6 +46,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onSwitchUser,
   syncStatus = 'connected',
+  settings,
+  onUpdateSettings,
+  schedules = [],
+  machines = [],
+  machineAssignments = [],
+  onUpdateSchedule,
+  onUpdateMachineAssignments,
+  onUpdateEmployees,
+  onUpdateMachines,
+  operationalDate,
 }) => {
   const [showSwitchMenu, setShowSwitchMenu] = React.useState(false);
   const [currentTime, setCurrentTime] = React.useState(new Date());
@@ -52,6 +74,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           icon: Shield,
         };
       case 'kepala_ruangan':
+      case 'karu':
         return {
           label: 'Kepala Ruangan HD',
           bg: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -70,6 +93,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           icon: Stethoscope,
         };
       case 'perawat':
+      case 'nurse':
+      default:
         return {
           label: 'Perawat Mahir HD',
           bg: 'bg-teal-100 text-teal-800 border-teal-200',
@@ -122,6 +147,16 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span>Offline</span>
               </span>
             )}
+          </div>
+
+          {/* Google Sheets Sync Pill in Top Banner */}
+          <span className="text-slate-600 hidden md:inline">|</span>
+          <div className="hidden md:flex items-center space-x-1 sm:space-x-1.5 text-[10px] sm:text-xs shrink-0">
+            <span className="text-slate-400 hidden lg:inline">Google Sheets:</span>
+            <span className="inline-flex items-center text-teal-300 font-semibold bg-teal-950/70 px-2 py-0.5 rounded-full border border-teal-700/60">
+              <FileSpreadsheet className="w-3 h-3 text-emerald-400 mr-1" />
+              <span>Tarik & Kirim Siap</span>
+            </span>
           </div>
         </div>
 
@@ -380,6 +415,24 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
       </div>
+
+      {/* Header Sync Google Sheets (Tarik & Kirim Data) */}
+      {settings && onUpdateSettings && onUpdateSchedule && onUpdateMachineAssignments && onUpdateEmployees && (
+        <HeaderGoogleSheetSync
+          schedules={schedules}
+          employees={allEmployees}
+          machines={machines}
+          machineAssignments={machineAssignments}
+          settings={settings}
+          onUpdateSettings={onUpdateSettings}
+          onUpdateSchedule={onUpdateSchedule}
+          onUpdateMachineAssignments={onUpdateMachineAssignments}
+          onUpdateEmployees={onUpdateEmployees}
+          onUpdateMachines={onUpdateMachines}
+          operationalDate={operationalDate}
+          canEdit={currentUser.role === 'admin' || currentUser.role === 'kepala_ruangan' || currentUser.role === 'karu' || currentUser.role === 'pj_shift'}
+        />
+      )}
     </header>
   );
 };

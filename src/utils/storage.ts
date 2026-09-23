@@ -1,4 +1,4 @@
-import { UserAccount, ShiftSchedule, HDMachine, MachineAssignment, SpecialTask, MachineZoneConfig, DEFAULT_ZONES } from '../types';
+import { UserAccount, ShiftSchedule, HDMachine, MachineAssignment, SpecialTask, MachineZoneConfig, DEFAULT_ZONES, AppSettings } from '../types';
 import { INITIAL_EMPLOYEES, INITIAL_MACHINES, INITIAL_SPECIAL_TASKS, getInitialSchedules, getInitialMachineAssignments } from '../data/initialData';
 import { autoAssignMachinesForShift, KNOWN_NURSE_NICKNAMES, NAME_TO_NICKNAME } from './scheduler';
 
@@ -345,6 +345,34 @@ export const storage = {
 
   saveSpecialTasks(tasks: SpecialTask[]) {
     localStorage.setItem(KEYS.SPECIAL_TASKS, JSON.stringify(tasks));
+    window.dispatchEvent(new Event('hd_data_updated'));
+  },
+
+  getSettings(): AppSettings {
+    try {
+      const data = localStorage.getItem('hd_shift_settings');
+      if (data) return JSON.parse(data);
+    } catch (e) {
+      console.error(e);
+    }
+    return {
+      id: 1,
+      hospitalName: "RS Happy Land Medical Centre",
+      roomName: "Ruang Dialisis Gedung Timur Lt.3",
+      headNurseName: "Kepala Ruang HD",
+      headNursePhone: "081234567801",
+      googleSheetWebhookUrl: "https://script.google.com/macros/s/AKfycbzvsIRYkK_4dGOlCGbGWu1nYNaZ35GNyhWUxSrUXsJGuibyCGuSFtqalr34VhAyTFns/exec",
+      googleSpreadsheetIdOrUrl: "https://docs.google.com/spreadsheets/d/1TDlfWi43WAPDojvRw00NsWaxT9sptTetZh64XL8U4Qg/edit?gid=1231706725#gid=1231706725",
+      autoSyncGoogleSheets: false,
+      minNursesPerShift: 8,
+      maxConsecutiveWorkDays: 5,
+      lastSyncTimestamp: 0,
+      lastSyncStatus: "Belum pernah disinkronkan"
+    };
+  },
+
+  saveSettings(settings: AppSettings) {
+    localStorage.setItem('hd_shift_settings', JSON.stringify(settings));
     window.dispatchEvent(new Event('hd_data_updated'));
   },
 

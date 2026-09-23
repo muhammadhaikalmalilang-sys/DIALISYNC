@@ -10,7 +10,8 @@ import {
   HDMachine, 
   MachineAssignment, 
   SpecialTask,
-  MachineZoneConfig
+  MachineZoneConfig,
+  AppSettings
 } from './types';
 import { storage } from './utils/storage';
 import { getTodayDateString } from './utils/scheduler';
@@ -32,11 +33,17 @@ export default function App() {
   const [zones, setZones] = useState<MachineZoneConfig[]>([]);
   const [machineAssignments, setMachineAssignments] = useState<MachineAssignment[]>([]);
   const [specialTasks, setSpecialTasks] = useState<SpecialTask[]>([]);
+  const [settings, setSettings] = useState<AppSettings>(() => storage.getSettings());
   const [operationalDate, setOperationalDate] = useState<string>(() => getTodayDateString());
   const [activeTab, setActiveTab] = useState<'dashboard' | 'jadwal' | 'mesin' | 'tugas' | 'karyawan'>('dashboard');
   const [showResetConfirmModal, setShowResetConfirmModal] = useState<boolean>(false);
   const [systemToast, setSystemToast] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('connecting');
+
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    storage.saveSettings(newSettings);
+  };
 
   // Load state from local storage
   const loadAllData = () => {
@@ -214,6 +221,16 @@ export default function App() {
         onLogout={handleLogout}
         onSwitchUser={handleSwitchUser}
         syncStatus={syncStatus}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+        schedules={schedules}
+        machines={machines}
+        machineAssignments={machineAssignments}
+        onUpdateSchedule={handleUpdateSchedule}
+        onUpdateMachineAssignments={handleUpdateAssignments}
+        onUpdateEmployees={handleUpdateEmployees}
+        onUpdateMachines={handleUpdateMachines}
+        operationalDate={operationalDate}
       />
 
       {/* Main Container */}
@@ -253,6 +270,11 @@ export default function App() {
             schedules={schedules}
             specialTasks={specialTasks}
             onUpdateSchedule={handleUpdateSchedule}
+            machines={machines}
+            machineAssignments={machineAssignments}
+            onUpdateMachineAssignments={handleUpdateAssignments}
+            settings={settings}
+            onUpdateSettings={handleUpdateSettings}
           />
         )}
 

@@ -1,4 +1,21 @@
-import { UserAccount, HDMachine, SpecialTask, ShiftSchedule, MachineAssignment } from '../types';
+import { UserAccount, HDMachine, SpecialTask, ShiftSchedule, MachineAssignment, AppSettings, Doctor } from '../types';
+
+export const INITIAL_SETTINGS: AppSettings = {
+  id: 1,
+  hospitalName: "RS Happy Land Medical Centre",
+  roomName: "Ruang Dialisis Gedung Timur Lt.3",
+  headNurseName: "Kepala Ruang HD",
+  headNursePhone: "081234567801",
+  googleSheetWebhookUrl: "https://script.google.com/macros/s/AKfycbzvsIRYkK_4dGOlCGbGWu1nYNaZ35GNyhWUxSrUXsJGuibyCGuSFtqalr34VhAyTFns/exec",
+  googleSpreadsheetIdOrUrl: "https://docs.google.com/spreadsheets/d/1TDlfWi43WAPDojvRw00NsWaxT9sptTetZh64XL8U4Qg/edit?gid=1231706725#gid=1231706725",
+  autoSyncGoogleSheets: false,
+  minNursesPerShift: 8,
+  maxConsecutiveWorkDays: 5,
+  lastSyncTimestamp: 0,
+  lastSyncStatus: "Belum pernah disinkronkan"
+};
+
+export const INITIAL_DOCTORS: Doctor[] = [];
 
 export const INITIAL_EMPLOYEES: UserAccount[] = [
   {
@@ -321,119 +338,145 @@ export const INITIAL_EMPLOYEES: UserAccount[] = [
   },
 ];
 
-export const HOSPITAL_LAYOUT_40_MACHINES: HDMachine[] = [
-  // Zona A (A01 - A12) - 12 Bed deretan tunggal sisi A
+export const HOSPITAL_LAYOUT_30_MACHINES: HDMachine[] = [
+  // 1. Bay A (A01 - A12) - Bay A Reguler
   ...Array.from({ length: 12 }, (_, i) => {
     const num = String(i + 1).padStart(2, '0');
     return {
       id: `mach-a${num}`,
       code: `A${num}`,
+      name: `Mesin HD A${num}`,
       brand: 'Fresenius Medical Care',
       model: '4008S Classic',
-      zone: 'Zona A (Reguler)',
+      brandModel: 'Fresenius 4008S',
+      zone: 'Bay A (Reguler)',
+      bay: 'Bay A (Reguler)',
+      category: 'REGULER' as const,
       status: 'siap' as const,
       serialNumber: `FMC-4008S-A${num}`,
       lastMaintenance: '2026-09-01',
-      notes: `Bed No. A${num} (Deretan 12 Bed Sisi A)`,
+      notes: `Bed No. A${num} (Bay A Reguler)`,
     };
   }),
-  // Zona B (B01 - B09) - 9 Bed (B01-B04 Sisi Lorong, B05-B09 Sisi Dinding Dekat Pintu Masuk)
-  ...Array.from({ length: 9 }, (_, i) => {
-    const num = String(i + 1).padStart(2, '0');
-    const isCorridor = i < 4; // B01-B04
-    return {
-      id: `mach-b${num}`,
-      code: `B${num}`,
-      brand: 'Fresenius Medical Care',
-      model: '4008S Classic',
-      zone: 'Zona B (Reguler)',
-      status: 'siap' as const,
-      serialNumber: `FMC-4008S-B${num}`,
-      lastMaintenance: '2026-09-01',
-      notes: isCorridor ? `Bed No. B${num} (Sisi B Sisi Lorong)` : `Bed No. B${num} (Sisi B Sisi Dinding)`,
-    };
-  }),
-  // Zona C (C01 - C08) - 8 Bed (C01-C04 Sisi Lorong, C05-C08 Sisi Dinding Barat)
-  ...Array.from({ length: 8 }, (_, i) => {
-    const num = String(i + 1).padStart(2, '0');
-    const isCorridor = i < 4; // C01-C04
-    return {
-      id: `mach-c${num}`,
-      code: `C${num}`,
-      brand: 'Fresenius Medical Care',
-      model: '4008S Classic',
-      zone: 'Zona C (Reguler)',
-      status: 'siap' as const,
-      serialNumber: `FMC-4008S-C${num}`,
-      lastMaintenance: '2026-09-01',
-      notes: isCorridor ? `Bed No. C${num} (Sisi C Sisi Lorong)` : `Bed No. C${num} (Sisi C Sisi Dinding)`,
-    };
-  }),
-  // Zona D (D01 - D03) - 3 Bed (Area D Sayap Luar)
-  ...Array.from({ length: 3 }, (_, i) => {
-    const num = String(i + 1).padStart(2, '0');
-    return {
-      id: `mach-d${num}`,
-      code: `D${num}`,
-      brand: 'Fresenius Medical Care',
-      model: '4008S Classic',
-      zone: 'Zona D (Reguler)',
-      status: 'siap' as const,
-      serialNumber: `FMC-4008S-D${num}`,
-      lastMaintenance: '2026-09-01',
-      notes: `Bed No. D${num} (Area D)`,
-    };
-  }),
-  // Zona E (E01 - E02) - 2 Bed (Area E Sayap Luar)
-  ...Array.from({ length: 2 }, (_, i) => {
-    const num = String(i + 1).padStart(2, '0');
-    return {
-      id: `mach-e${num}`,
-      code: `E${num}`,
-      brand: 'Fresenius Medical Care',
-      model: '4008S Classic',
-      zone: 'Zona E (Reguler)',
-      status: 'siap' as const,
-      serialNumber: `FMC-4008S-E${num}`,
-      lastMaintenance: '2026-09-01',
-      notes: `Bed No. E${num} (Area E)`,
-    };
-  }),
-  // Zona F (F01 - F02) - 2 Bed (Area F Sayap Luar)
-  ...Array.from({ length: 2 }, (_, i) => {
-    const num = String(i + 1).padStart(2, '0');
-    return {
-      id: `mach-f${num}`,
-      code: `F${num}`,
-      brand: 'Fresenius Medical Care',
-      model: '4008S Classic',
-      zone: 'Zona F (Reguler)',
-      status: 'siap' as const,
-      serialNumber: `FMC-4008S-F${num}`,
-      lastMaintenance: '2026-09-01',
-      notes: `Bed No. F${num} (Area F)`,
-    };
-  }),
-  // Zona Isolasi (ISO 01 - ISO 04) - 4 Bed (Ruang Isolasi Khusus)
+  // 2. Bay C Depan (C01 - C04)
   ...Array.from({ length: 4 }, (_, i) => {
     const num = String(i + 1).padStart(2, '0');
     return {
-      id: `mach-iso${num}`,
-      code: `ISO ${num}`,
-      brand: 'Fresenius Medical Care',
-      model: '5008S CorDiax',
-      zone: 'Zona Isolasi',
+      id: `mach-c${num}`,
+      code: `C${num}`,
+      name: `Mesin HD C${num}`,
+      brand: 'Nipro',
+      model: 'Surdial 55Plus',
+      brandModel: 'Nipro Surdial 55Plus',
+      zone: 'Bay C (Depan)',
+      bay: 'Bay C (Depan)',
+      category: 'REGULER' as const,
       status: 'siap' as const,
-      serialNumber: `FMC-5008S-ISO${num}`,
+      serialNumber: `NIPRO-55P-C${num}`,
       lastMaintenance: '2026-09-01',
-      notes: `Bed Isolasi ISO ${num} (Ruang Isolasi Khusus Infeksius / CITO)`,
+      notes: `Bed No. C${num} (Bay C Depan)`,
     };
   }),
+  // 3. Bay B (B01 - B09) - Bay B Reguler
+  ...Array.from({ length: 9 }, (_, i) => {
+    const num = String(i + 1).padStart(2, '0');
+    return {
+      id: `mach-b${num}`,
+      code: `B${num}`,
+      name: `Mesin HD B${num}`,
+      brand: 'Gambro',
+      model: 'AK98',
+      brandModel: 'Gambro AK98',
+      zone: 'Bay B (Reguler)',
+      bay: 'Bay B (Reguler)',
+      category: 'REGULER' as const,
+      status: 'siap' as const,
+      serialNumber: `GAMBRO-AK98-B${num}`,
+      lastMaintenance: '2026-09-01',
+      notes: `Bed No. B${num} (Bay B Reguler)`,
+    };
+  }),
+  // 4. Bay C Khusus & Isolasi (C05 - C09)
+  {
+    id: 'mach-c05',
+    code: 'C05',
+    name: 'Mesin HD C05',
+    brand: 'Nipro',
+    model: 'Surdial 55Plus',
+    brandModel: 'Nipro Surdial 55Plus',
+    zone: 'Bay C (Khusus & Isolasi)',
+    bay: 'Bay C (Khusus & Isolasi)',
+    category: 'REGULER' as const,
+    status: 'siap' as const,
+    serialNumber: 'NIPRO-55P-C05',
+    lastMaintenance: '2026-09-01',
+    notes: 'Bed No. C05 (Reguler)',
+  },
+  {
+    id: 'mach-c06',
+    code: 'C06',
+    name: 'Mesin HD C06 (Hep B)',
+    brand: 'Fresenius Medical Care',
+    model: '4008S Dedicated',
+    brandModel: 'Fresenius 4008S Dedicated',
+    zone: 'Bay C (Khusus & Isolasi)',
+    bay: 'Bay C (Khusus & Isolasi)',
+    category: 'HEPATITIS_B' as const,
+    status: 'siap' as const,
+    serialNumber: 'FMC-4008S-C06',
+    lastMaintenance: '2026-09-01',
+    notes: 'Khusus Hepatitis B',
+  },
+  {
+    id: 'mach-c07',
+    code: 'C07',
+    name: 'Mesin HD C07 (Hep C)',
+    brand: 'Gambro',
+    model: 'AK98 Dedicated',
+    brandModel: 'Gambro AK98 Dedicated',
+    zone: 'Bay C (Khusus & Isolasi)',
+    bay: 'Bay C (Khusus & Isolasi)',
+    category: 'HEPATITIS_C' as const,
+    status: 'siap' as const,
+    serialNumber: 'GAMBRO-AK98-C07',
+    lastMaintenance: '2026-09-01',
+    notes: 'Khusus Hepatitis C',
+  },
+  {
+    id: 'mach-c08',
+    code: 'C08',
+    name: 'Mesin HD C08 (Isolasi)',
+    brand: 'Fresenius Medical Care',
+    model: '5008S Multi-filter',
+    brandModel: 'Fresenius 5008S Multi-filter',
+    zone: 'Bay C (Khusus & Isolasi)',
+    bay: 'Bay C (Khusus & Isolasi)',
+    category: 'ISOLASI' as const,
+    status: 'siap' as const,
+    serialNumber: 'FMC-5008S-C08',
+    lastMaintenance: '2026-09-01',
+    notes: 'Ruang Isolasi Tekanan Negatif / CITO',
+  },
+  {
+    id: 'mach-c09',
+    code: 'C09',
+    name: 'Mesin HD C09 (Isolasi)',
+    brand: 'Fresenius Medical Care',
+    model: '5008S Multi-filter',
+    brandModel: 'Fresenius 5008S Multi-filter',
+    zone: 'Bay C (Khusus & Isolasi)',
+    bay: 'Bay C (Khusus & Isolasi)',
+    category: 'ISOLASI' as const,
+    status: 'siap' as const,
+    serialNumber: 'FMC-5008S-C09',
+    lastMaintenance: '2026-09-01',
+    notes: 'Ruang Isolasi Tekanan Negatif / CITO',
+  },
 ];
 
-export const HOSPITAL_LAYOUT_41_MACHINES = HOSPITAL_LAYOUT_40_MACHINES;
-export const HOSPITAL_LAYOUT_30_MACHINES = HOSPITAL_LAYOUT_40_MACHINES;
-export const INITIAL_MACHINES: HDMachine[] = HOSPITAL_LAYOUT_40_MACHINES;
+export const HOSPITAL_LAYOUT_40_MACHINES = HOSPITAL_LAYOUT_30_MACHINES;
+export const HOSPITAL_LAYOUT_41_MACHINES = HOSPITAL_LAYOUT_30_MACHINES;
+export const INITIAL_MACHINES: HDMachine[] = HOSPITAL_LAYOUT_30_MACHINES;
 
 export const INITIAL_SPECIAL_TASKS: SpecialTask[] = [
   // Shift Pagi (2026-09-19)

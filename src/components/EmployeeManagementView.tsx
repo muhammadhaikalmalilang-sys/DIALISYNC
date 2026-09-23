@@ -261,12 +261,15 @@ export const EmployeeManagementView: React.FC<EmployeeManagementViewProps> = ({
       case 'admin':
         return { label: 'Administrator', bg: 'bg-purple-100 text-purple-800 border-purple-200' };
       case 'kepala_ruangan':
+      case 'karu':
         return { label: 'Kepala Ruang', bg: 'bg-amber-100 text-amber-800 border-amber-200' };
       case 'pj_shift':
         return { label: 'PJ Shift HD', bg: 'bg-emerald-100 text-emerald-800 border-emerald-200' };
       case 'dokter':
         return { label: 'Dokter HD', bg: 'bg-blue-100 text-blue-800 border-blue-200' };
       case 'perawat':
+      case 'nurse':
+      default:
         return { label: 'Perawat Mahir HD', bg: 'bg-teal-100 text-teal-800 border-teal-200' };
     }
   };
